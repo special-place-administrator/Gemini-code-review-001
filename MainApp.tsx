@@ -9,6 +9,7 @@ import Loader from './components/Loader';
 import { PasteIcon } from './components/icons/PasteIcon';
 import { GitIcon } from './components/icons/GitIcon';
 import { SettingsIcon } from './components/icons/SettingsIcon';
+import { CodeIcon } from './components/icons/CodeIcon';
 
 type ViewMode = 'settings' | 'paste' | 'repo';
 
@@ -24,6 +25,16 @@ interface FileError {
 }
 
 const GITHUB_URL_REGEX = /^https:\/\/github\.com\/[^/]+\/[^/]+(\/)?$/;
+
+// Moved NavButton outside the MainApp component to prevent it from being
+// recreated on every render, which is more performant.
+const NavButton = ({ mode, currentMode, setMode, children, label }: { mode: ViewMode, currentMode: ViewMode, setMode: (mode: ViewMode) => void, children: React.ReactNode, label: string }) => (
+  <button onClick={() => setMode(mode)} className={`flex flex-col items-center p-2 rounded-lg transition-colors ${currentMode === mode ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-gray-700'}`} aria-label={label}>
+   {children}
+   <span className="text-xs mt-1">{label}</span>
+  </button>
+);
+
 
 const MainApp = () => {
   const [apiKey, setApiKey] = useState('');
@@ -256,18 +267,11 @@ const MainApp = () => {
     }
   };
 
-  const NavButton = ({ mode, currentMode, setMode, children, label }: { mode: ViewMode, currentMode: ViewMode, setMode: (mode: ViewMode) => void, children: React.ReactNode, label: string }) => (
-     <button onClick={() => setMode(mode)} className={`flex flex-col items-center p-2 rounded-lg transition-colors ${currentMode === mode ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-gray-700'}`} aria-label={label}>
-      {children}
-      <span className="text-xs mt-1">{label}</span>
-     </button>
-  );
-
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col p-4 md:p-6 lg:p-8">
       <header className="w-full max-w-7xl mx-auto flex justify-between items-center mb-6">
         <div className="flex items-center space-x-2">
-            <svg className="w-8 h-8 text-cyan-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            <CodeIcon className="w-8 h-8 text-cyan-400" />
             <h1 className="text-2xl font-bold">Gemini Code Reviewer</h1>
         </div>
         <nav className="flex space-x-2 bg-gray-800 p-1 rounded-lg">
@@ -288,4 +292,4 @@ const MainApp = () => {
   );
 };
 
-export default MainApp;
+export export default MainApp;
