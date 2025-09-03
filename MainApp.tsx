@@ -8,8 +8,8 @@ import CopyButton from './components/CopyButton';
 import Loader from './components/Loader';
 import { PasteIcon } from './components/icons/PasteIcon';
 import { GitIcon } from './components/icons/GitIcon';
-import { SettingsIcon } from './components/icons/SettingsIcon';
 import { CodeIcon } from './components/icons/CodeIcon';
+import { SettingsIcon } from './components/icons/SettingsIcon';
 
 type ViewMode = 'settings' | 'paste' | 'repo';
 
@@ -29,7 +29,7 @@ const GITHUB_URL_REGEX = /^https:\/\/github\.com\/[^/]+\/[^/]+(\/)?$/;
 // Moved NavButton outside the MainApp component to prevent it from being
 // recreated on every render, which is more performant.
 const NavButton = ({ mode, currentMode, setMode, children, label }: { mode: ViewMode, currentMode: ViewMode, setMode: (mode: ViewMode) => void, children: React.ReactNode, label: string }) => (
-  <button onClick={() => setMode(mode)} className={`flex flex-col items-center p-2 rounded-lg transition-colors ${currentMode === mode ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-gray-700'}`} aria-label={label}>
+  <button onClick={() => setMode(mode)} className={`flex flex-col items-center justify-center text-center w-20 p-2 rounded-lg transition-colors ${currentMode === mode ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-gray-700'}`} aria-label={label}>
    {children}
    <span className="text-xs mt-1">{label}</span>
   </button>
@@ -37,7 +37,7 @@ const NavButton = ({ mode, currentMode, setMode, children, label }: { mode: View
 
 
 const MainApp = () => {
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState<string | null>(() => localStorage.getItem('gemini-api-key'));
   const [tempApiKey, setTempApiKey] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('settings');
   
@@ -55,28 +55,34 @@ const MainApp = () => {
   const [repoReviews, setRepoReviews] = useState<FileReview[]>([]);
   const [repoErrors, setRepoErrors] = useState<FileError[]>([]);
   const [repoProgress, setRepoProgress] = useState<{ current: number; total: number } | null>(null);
-
+  const [repoScanSummary, setRepoScanSummary] = useState<{ total: number; analyzed: number; withIssues: number; errors: number } | null>(null);
 
   useEffect(() => {
-    const savedKey = localStorage.getItem('gemini_api_key');
-    if (savedKey) {
-      setApiKey(savedKey);
-      setTempApiKey(savedKey);
-      setViewMode('paste'); // Go to paste mode if key exists
+    if (apiKey) {
+      localStorage.setItem('gemini-api-key', apiKey);
+      setTempApiKey(apiKey);
+      // If key is set, move away from settings to a useful tab
+      if (viewMode === 'settings') {
+          setViewMode('paste');
+      }
+    } else {
+      localStorage.removeItem('gemini-api-key');
+      setViewMode('settings');
     }
-  }, []);
-
-  const handleApiKeySave = useCallback(() => {
-    localStorage.setItem('gemini_api_key', tempApiKey);
-    setApiKey(tempApiKey);
-    setViewMode('paste'); // Switch to paste mode after saving
-  }, [tempApiKey]);
+  }, [apiKey, viewMode]);
   
-  const handleApiKeyClear = useCallback(() => {
-    localStorage.removeItem('gemini_api_key');
-    setApiKey('');
-    setTempApiKey('');
-  }, []);
+  const handleSaveApiKey = () => {
+      if (tempApiKey.trim()) {
+          setApiKey(tempApiKey.trim());
+          alert('API Key saved successfully!');
+      }
+  };
+  
+  const handleClearApiKey = () => {
+      setApiKey(null);
+      setTempApiKey('');
+  };
+
 
   const handleRepoUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newUrl = e.target.value;
@@ -85,6 +91,10 @@ const MainApp = () => {
   }, []);
 
   const handleReviewPaste = useCallback(async () => {
+    if (!apiKey) {
+        setError("API Key is not set. Please set it in the Settings tab.");
+        return;
+    }
     setIsLoading(true);
     setError(null);
     setPasteFeedback(null);
@@ -100,12 +110,17 @@ const MainApp = () => {
   }, [apiKey, pasteCode, pasteLanguage]);
   
   const handleAutonomousReview = useCallback(async () => {
+      if (!apiKey) {
+        setError("API Key is not set. Please set it in the Settings tab.");
+        return;
+      }
       if (!isRepoUrlValid || !repoUrl) return;
 
       setIsLoading(true);
       setError(null);
       setRepoReviews([]);
       setRepoErrors([]);
+      setRepoScanSummary(null);
       setRepoProgress({ current: 0, total: 0 });
 
       try {
@@ -114,7 +129,11 @@ const MainApp = () => {
           
           setRepoProgress({ current: 0, total: reviewableFiles.length });
           
-          const { owner, repo } = parseGitHubUrl(repoUrl)!;
+          const urlParts = parseGitHubUrl(repoUrl);
+          if (!urlParts) {
+              throw new Error("Could not parse GitHub URL parts.");
+          }
+          const { owner, repo } = urlParts;
           
           const newReviews: FileReview[] = [];
           const newErrors: FileError[] = [];
@@ -139,6 +158,12 @@ const MainApp = () => {
           }
           setRepoReviews(newReviews);
           setRepoErrors(newErrors);
+          setRepoScanSummary({
+            total: fileTree.length,
+            analyzed: reviewableFiles.length,
+            withIssues: newReviews.length,
+            errors: newErrors.length
+          });
 
       } catch (e: any) {
           setError(e.message);
@@ -148,26 +173,55 @@ const MainApp = () => {
       }
   }, [apiKey, repoUrl, isRepoUrlValid]);
 
+  const groupReviewsByLanguage = (reviews: FileReview[]) => {
+      return reviews.reduce((acc, review) => {
+          const lang = getLanguageForFile(review.path) || 'Other';
+          if (!acc[lang]) {
+              acc[lang] = [];
+          }
+          acc[lang].push(review);
+          return acc;
+      }, {} as Record<string, FileReview[]>);
+  };
+
 
   const renderContent = () => {
+    if (!apiKey && viewMode !== 'settings') {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-gray-800 rounded-lg">
+          <h2 className="text-2xl font-bold text-yellow-400 mb-4">API Key Required</h2>
+          <p className="text-gray-300 mb-6">Please set your Google Gemini API key in the Settings tab to begin.</p>
+          <button onClick={() => setViewMode('settings')} className="px-6 py-2 bg-cyan-600 text-white font-bold rounded-lg hover:bg-cyan-700 transition">
+            Go to Settings
+          </button>
+        </div>
+      );
+    }
+    
     if (viewMode === 'settings') {
       return (
-        <div className="w-full max-w-lg mx-auto">
-          <h2 className="text-2xl font-bold text-white mb-4">Settings</h2>
-          <p className="text-gray-400 mb-6">Please enter your Google Gemini API key to use the code reviewer.</p>
-          <div className="space-y-4">
-            <input
-              type="password"
-              value={tempApiKey}
-              onChange={(e) => setTempApiKey(e.target.value)}
-              placeholder="Enter your Gemini API Key"
-              className="w-full bg-gray-700 border border-gray-600 text-white py-3 px-4 rounded-lg focus:outline-none focus:bg-gray-600 focus:border-cyan-500"
-            />
-            <div className="flex space-x-4">
-              <button onClick={handleApiKeySave} disabled={!tempApiKey} className="flex-1 px-6 py-3 bg-cyan-600 text-white font-bold rounded-lg hover:bg-cyan-700 disabled:bg-gray-500 disabled:cursor-not-allowed transition">Save Key</button>
-              <button onClick={handleApiKeyClear} className="flex-1 px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition">Clear Key</button>
+        <div className="w-full max-w-lg mx-auto bg-gray-800 p-8 rounded-lg">
+            <h2 className="text-2xl font-bold text-white mb-4">Settings</h2>
+            <p className="text-gray-400 mb-6">Your Gemini API key is stored securely in your browser's local storage and is never sent anywhere except to Google's API.</p>
+            <div className="mb-4">
+                <label htmlFor="apiKey" className="block text-gray-300 text-sm font-bold mb-2">Google Gemini API Key</label>
+                <input
+                    type="password"
+                    id="apiKey"
+                    value={tempApiKey}
+                    onChange={(e) => setTempApiKey(e.target.value)}
+                    placeholder="Enter your API key"
+                    className="w-full bg-gray-700 border border-gray-600 text-white py-2 px-3 rounded-lg leading-tight focus:outline-none focus:bg-gray-600 focus:border-cyan-500 transition"
+                />
             </div>
-          </div>
+            <div className="flex items-center gap-4">
+                <button onClick={handleSaveApiKey} className="px-6 py-2 bg-cyan-600 text-white font-bold rounded-lg hover:bg-cyan-700 disabled:bg-gray-500 transition">
+                    Save Key
+                </button>
+                <button onClick={handleClearApiKey} className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition">
+                    Clear Key
+                </button>
+            </div>
         </div>
       );
     }
@@ -207,6 +261,7 @@ const MainApp = () => {
     }
 
     if (viewMode === 'repo') {
+       const groupedReviews = groupReviewsByLanguage(repoReviews);
        return (
         <>
           <div className="w-full flex flex-col md:flex-row gap-4 mb-4">
@@ -228,38 +283,50 @@ const MainApp = () => {
           {isLoading && repoProgress && <Loader message={`Analyzing file ${repoProgress.current} of ${repoProgress.total}...`} />}
           {error && <div className="mt-4 p-4 bg-red-900/50 text-red-300 border border-red-700 rounded-lg">{error}</div>}
           
-          {!isLoading && (repoReviews.length > 0 || repoErrors.length > 0) && (
-             <div className="mt-6 space-y-4">
-              <h3 className="text-xl font-bold text-white">Review Summary</h3>
-              {repoErrors.length > 0 && (
-                <details className="bg-red-900/50 p-4 rounded-lg">
-                  <summary className="cursor-pointer font-semibold text-red-300">Encountered {repoErrors.length} error(s)</summary>
-                  <ul className="mt-2 list-disc list-inside text-red-400">
-                    {repoErrors.map(err => <li key={err.path}><strong>{err.path}:</strong> {err.error}</li>)}
-                  </ul>
-                </details>
-              )}
-               {repoReviews.length > 0 && (
-                <details className="bg-gray-800 p-4 rounded-lg" open>
-                  <summary className="cursor-pointer font-semibold text-gray-200">Found issues in {repoReviews.length} file(s)</summary>
-                   <div className="mt-4 space-y-4">
-                  {repoReviews.map(review => (
-                      <details key={review.path} className="bg-gray-900 p-4 rounded-lg">
-                          <summary className="cursor-pointer font-semibold text-cyan-400">{review.path}</summary>
-                          <div className="mt-2 relative">
-                            <div className="p-4 border-t border-gray-700 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: review.htmlFeedback }}></div>
-                            <CopyButton textToCopy={review.rawFeedback} />
-                          </div>
-                      </details>
-                  ))}
-                  </div>
-                </details>
-              )}
-              {repoReviews.length === 0 && repoErrors.length === 0 && (
-                 <div className="p-4 bg-green-900/50 text-green-300 border border-green-700 rounded-lg">
-                  Excellent! No significant issues were found in any of the reviewed files.
-                 </div>
-              )}
+          {!isLoading && repoScanSummary && (
+             <div className="mt-6 space-y-6">
+                 {/* Executive Summary */}
+                <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <h3 className="text-xl font-bold text-white mb-3">Executive Summary</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div className="bg-gray-900 p-3 rounded-md"><p className="text-2xl font-bold text-cyan-400">{repoScanSummary.total}</p><p className="text-sm text-gray-400">Total Files</p></div>
+                        <div className="bg-gray-900 p-3 rounded-md"><p className="text-2xl font-bold text-cyan-400">{repoScanSummary.analyzed}</p><p className="text-sm text-gray-400">Files Analyzed</p></div>
+                        <div className="bg-gray-900 p-3 rounded-md"><p className="text-2xl font-bold text-yellow-400">{repoScanSummary.withIssues}</p><p className="text-sm text-gray-400">Issues Found</p></div>
+                        <div className="bg-gray-900 p-3 rounded-md"><p className="text-2xl font-bold text-red-400">{repoScanSummary.errors}</p><p className="text-sm text-gray-400">Scan Errors</p></div>
+                    </div>
+                </div>
+
+                {repoErrors.length > 0 && (
+                    <details className="bg-red-900/50 p-4 rounded-lg">
+                        <summary className="cursor-pointer font-semibold text-red-300">Encountered {repoErrors.length} file scan error(s)</summary>
+                        <ul className="mt-2 list-disc list-inside text-red-400 font-mono text-sm">
+                        {repoErrors.map(err => <li key={err.path}><strong>{err.path}:</strong> {err.error}</li>)}
+                        </ul>
+                    </details>
+                )}
+
+                {Object.keys(groupedReviews).length > 0 ? (
+                    Object.entries(groupedReviews).map(([language, reviews]) => (
+                        <details key={language} className="bg-gray-800 p-4 rounded-lg" open>
+                            <summary className="cursor-pointer font-semibold text-gray-200 text-lg">{language} ({reviews.length} file(s) with issues)</summary>
+                            <div className="mt-4 space-y-4">
+                                {reviews.map(review => (
+                                    <details key={review.path} className="bg-gray-900 p-4 rounded-lg">
+                                        <summary className="cursor-pointer font-semibold text-cyan-400">{review.path}</summary>
+                                        <div className="mt-2 relative">
+                                        <div className="p-4 border-t border-gray-700 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: review.htmlFeedback }}></div>
+                                        <CopyButton textToCopy={review.rawFeedback} />
+                                        </div>
+                                    </details>
+                                ))}
+                            </div>
+                        </details>
+                    ))
+                ) : repoErrors.length === 0 && (
+                    <div className="p-4 bg-green-900/50 text-green-300 border border-green-700 rounded-lg">
+                        Excellent! No significant issues were found in any of the {repoScanSummary.analyzed} analyzed files.
+                    </div>
+                )}
             </div>
           )}
         </>
@@ -281,15 +348,10 @@ const MainApp = () => {
         </nav>
       </header>
       <main className="w-full max-w-7xl mx-auto flex flex-col flex-1">
-        {apiKey || viewMode === 'settings' ? renderContent() : (
-            <div className="text-center p-8 bg-gray-800 rounded-lg">
-                <h2 className="text-2xl font-bold text-white mb-4">API Key Required</h2>
-                <p className="text-gray-400 mb-6">Please go to the <button onClick={() => setViewMode('settings')} className="text-cyan-400 underline">Settings</button> tab to enter your Gemini API key.</p>
-            </div>
-        )}
+        {renderContent()}
       </main>
     </div>
   );
 };
 
-export export default MainApp;
+export default MainApp;

@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 
 export const reviewCode = async (apiKey: string, code: string, language: string, filePath?: string): Promise<string> => {
   if (!apiKey) {
-    return "Error: Gemini API key is not configured. Please set it in the Settings tab.";
+    throw new Error("API Key is missing. Please provide it in the Settings tab.");
   }
   if (!code.trim()) {
     return "Please provide some code to review.";
@@ -49,7 +49,7 @@ export const reviewCode = async (apiKey: string, code: string, language: string,
     if (error instanceof Error) {
         // Provide a more user-friendly error message
         if (error.message.includes('API key not valid')) {
-            return "Error: The provided Gemini API key is invalid. Please check it in the Settings tab.";
+            return "Error: The Gemini API key you provided is invalid. Please check it in the Settings tab.";
         }
         return `An error occurred while communicating with the API: ${error.message}`;
     }
