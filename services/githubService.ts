@@ -65,7 +65,7 @@ export const fetchRepoFileTree = async (repoUrl: string): Promise<{ path: string
             throw new Error('Repository not found. Please check the URL and ensure the repository is public.');
         }
         if (repoInfoRes.status === 403) {
-            throw new Error('GitHub API rate limit exceeded. Please wait a moment and try again.');
+            throw new Error('GitHub API rate limit exceeded (60 requests/hour for unauthenticated users). Please wait a moment and try again.');
         }
         throw new Error(`Could not fetch repository info (status: ${repoInfoRes.status}).`);
     }
@@ -76,7 +76,7 @@ export const fetchRepoFileTree = async (repoUrl: string): Promise<{ path: string
     const branchInfoRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/branches/${defaultBranch}`);
     if (!branchInfoRes.ok) {
          if (branchInfoRes.status === 403) {
-            throw new Error('GitHub API rate limit exceeded. Please wait a moment and try again.');
+            throw new Error('GitHub API rate limit exceeded (60 requests/hour for unauthenticated users). Please wait a moment and try again.');
         }
         throw new Error(`Could not fetch branch info (status: ${branchInfoRes.status}).`);
     }
@@ -87,7 +87,7 @@ export const fetchRepoFileTree = async (repoUrl: string): Promise<{ path: string
     const treeRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`);
     if (!treeRes.ok) {
          if (treeRes.status === 403) {
-            throw new Error('GitHub API rate limit exceeded. Please wait a moment and try again.');
+            throw new Error('GitHub API rate limit exceeded (60 requests/hour for unauthenticated users). Please wait a moment and try again.');
         }
         throw new Error(`Could not fetch file tree (status: ${treeRes.status}).`);
     }
@@ -109,7 +109,7 @@ export const getFileContent = async (owner: string, repo: string, path: string):
     const contentRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${path}`);
     if (!contentRes.ok) {
         if (contentRes.status === 403) {
-            throw new Error('GitHub API rate limit exceeded while fetching file content. Please wait a moment and try again.');
+            throw new Error('GitHub API rate limit exceeded for this file.');
         }
         throw new Error(`Failed to fetch content for ${path} (status: ${contentRes.status}).`);
     }

@@ -20,6 +20,25 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #6b7280; /* bg-gray-500 */
       }
+      
+      /* Basic styles for rendered markdown */
+      .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 { margin-top: 1.25em; margin-bottom: 0.5em; font-weight: 600; }
+      .prose p { margin-top: 1em; margin-bottom: 1em; }
+      .prose strong { font-weight: 600; }
+      .prose ul, .prose ol { margin-top: 1em; margin-bottom: 1em; padding-left: 1.5em; }
+      .prose li { margin-top: 0.5em; margin-bottom: 0.5em; }
+      .prose code { background-color: #374151; padding: 0.2em 0.4em; margin: 0; font-size: 85%; border-radius: 3px; }
+      .prose pre { background-color: #1f2937; padding: 1em; border-radius: 6px; overflow-x: auto; }
+      .prose pre code { background-color: transparent; padding: 0; }
+      .prose a { text-decoration: underline; }
+      .prose blockquote { border-left: 4px solid #4b5563; padding-left: 1em; margin-top: 1.5em; margin-bottom: 1.5em; }
+      .prose-invert h1, .prose-invert h2, .prose-invert h3, .prose-invert h4, .prose-invert h5, .prose-invert h6 { color: #fff; }
+      .prose-invert p { color: #d1d5db; }
+      .prose-invert strong { color: #fff; }
+      .prose-invert code { color: #e5e7eb; background-color: #4b5563; }
+      .prose-invert pre { background-color: #111827; }
+      .prose-invert a { color: #93c5fd; }
+      .prose-invert blockquote { border-left-color: #6b7280; color: #9ca3af; }
     </style>
   <script type="importmap">
 {
@@ -27,7 +46,8 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "react": "https://aistudiocdn.com/react@^19.1.1",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0",
+    "marked": "https://aistudiocdn.com/marked@^13.0.2"
   }
 }
 </script>

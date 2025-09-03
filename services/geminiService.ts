@@ -1,23 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  // In a real app, you'd want to handle this more gracefully,
-  // but for this context, throwing an error is sufficient.
-  // The environment variable is expected to be set externally.
-  console.error("API_KEY environment variable not set. The app will not function.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
-
-export const reviewCode = async (code: string, language: string, filePath?: string): Promise<string> => {
+export const reviewCode = async (apiKey: string, code: string, language: string, filePath?: string): Promise<string> => {
+  if (!apiKey) {
+    return "Error: Gemini API key is not configured. Please set it in the Settings tab.";
+  }
   if (!code.trim()) {
     return "Please provide some code to review.";
   }
-   if (!API_KEY) {
-    return "Error: Gemini API key is not configured. Please contact the administrator.";
-  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const fileContext = filePath ? `The following code is from the file: \`${filePath}\`.` : '';
 
@@ -58,7 +49,7 @@ export const reviewCode = async (code: string, language: string, filePath?: stri
     if (error instanceof Error) {
         // Provide a more user-friendly error message
         if (error.message.includes('API key not valid')) {
-            return "Error: The configured Gemini API key is invalid. Please contact the administrator.";
+            return "Error: The provided Gemini API key is invalid. Please check it in the Settings tab.";
         }
         return `An error occurred while communicating with the API: ${error.message}`;
     }
