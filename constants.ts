@@ -1,0 +1,17 @@
+export const PROGRAMMING_LANGUAGES = [
+  "JavaScript",
+  "TypeScript",
+  "Python",
+  "Java",
+  "C++",
+  "C#",
+  "Go",
+  "Rust",
+  "Ruby",
+  "PHP",
+  "Swift",
+  "Kotlin",
+  "SQL",
+  "HTML",
+  "CSS",
+];
