@@ -11,17 +11,20 @@ if (!API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: API_KEY! });
 
-export const reviewCode = async (code: string, language: string): Promise<string> => {
+export const reviewCode = async (code: string, language: string, filePath?: string): Promise<string> => {
   if (!code.trim()) {
     return "Please provide some code to review.";
   }
    if (!API_KEY) {
     return "Error: Gemini API key is not configured. Please contact the administrator.";
   }
+  
+  const fileContext = filePath ? `The following code is from the file: \`${filePath}\`.` : '';
 
   const prompt = `
-    As an expert senior software engineer and code reviewer, please provide a thorough review of the following ${language} code snippet.
-
+    As an expert senior software engineer and code reviewer, please provide a thorough review of the following ${language} code.
+    ${fileContext}
+    
     Your review should be comprehensive and constructive. Structure your feedback into the following sections using Markdown formatting:
     1.  **Overall Assessment:** A brief summary of the code's quality, purpose, and adherence to best practices.
     2.  **Potential Bugs & Errors:** Identify any logical errors, edge cases not handled, or potential runtime exceptions.
@@ -31,6 +34,8 @@ export const reviewCode = async (code: string, language: string): Promise<string
     6.  **Refactoring Suggestions:** Provide concrete examples of how the code could be refactored for better maintainability and structure.
 
     Format your response clearly using Markdown-style headings, bold text, and lists. Be specific in your feedback and provide corrected code examples in fenced code blocks where applicable.
+
+    **IMPORTANT:** If you find no significant issues, bugs, or areas for improvement, please respond with the exact phrase "No issues found." and nothing else.
 
     Here is the code to review:
     \`\`\`${language.toLowerCase()}
@@ -42,12 +47,20 @@ export const reviewCode = async (code: string, language: string): Promise<string
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
+      config: {
+        // Lower temperature for more deterministic and factual code reviews
+        temperature: 0.2,
+      }
     });
     return response.text;
   } catch (error) {
     console.error("Error reviewing code with Gemini API:", error);
     if (error instanceof Error) {
-        return `An error occurred while reviewing the code: ${error.message}`;
+        // Provide a more user-friendly error message
+        if (error.message.includes('API key not valid')) {
+            return "Error: The configured Gemini API key is invalid. Please contact the administrator.";
+        }
+        return `An error occurred while communicating with the API: ${error.message}`;
     }
     return "An unknown error occurred while reviewing the code.";
   }
